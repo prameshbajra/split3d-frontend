@@ -1,0 +1,29 @@
+<section class="viewer-shell">
+  <header class="viewer-header">
+    <div>
+      <h1>Split3D Viewer</h1>
+      <p>Upload an STL or 3MF file to inspect it interactively.</p>
+    </div>
+    <label class="upload-button">
+      <input type="file" accept=".stl,.3mf" (change)="onFilesSelected($event)" />
+      <span>Choose Model</span>
+    </label>
+  </header>
+
+  <div class="meta">
+    <ng-container *ngIf="loadedFileName; else noModel">
+      <p class="status">Loaded: {{ loadedFileName }}</p>
+    </ng-container>
+    <ng-template #noModel>
+      <p class="status status--placeholder">No model loaded yet.</p>
+    </ng-template>
+    <p *ngIf="errorMessage" class="error">{{ errorMessage }}</p>
+  </div>
+
+  <div class="viewer-container" #viewerContainer>
+    <div class="empty-state" *ngIf="!loadedFileName">
+      <p>Select a model to start exploring.</p>
+      <p class="hint">Pan with right-click, rotate with left-click, zoom with scroll.</p>
+    </div>
+  </div>
+</section>

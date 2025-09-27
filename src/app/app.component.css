@@ -1,0 +1,26 @@
+:host {
+  display: block;
+  height: 100%;
+}
+
+.app-shell {
+  min-height: 100vh;
+  height: 100vh;
+  width: 100%;
+  display: flex;
+  padding: clamp(1rem, 2vw, 2.5rem);
+  background: radial-gradient(circle at top, rgba(59, 130, 246, 0.25), transparent 55%), #0f172a;
+  color: #e2e8f0;
+  box-sizing: border-box;
+  margin: 0;
+}
+
+.app-shell > * {
+  flex: 1 1 auto;
+}
+
+@media (max-width: 720px) {
+  .app-shell {
+    padding: 1rem;
+  }
+}

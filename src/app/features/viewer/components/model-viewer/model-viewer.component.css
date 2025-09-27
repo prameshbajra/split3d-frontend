@@ -1,0 +1,133 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+}
+
+.viewer-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  flex: 1 1 auto;
+  min-height: 100%;
+}
+
+.viewer-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.viewer-header h1 {
+  margin: 0;
+  font-size: clamp(1.5rem, 2vw, 2.25rem);
+  color: #f9fafb;
+}
+
+.viewer-header p {
+  margin: 0.25rem 0 0;
+  color: #cbd5f5;
+  font-size: 0.95rem;
+}
+
+.upload-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: #2563eb;
+  color: #f9fafb;
+  padding: 0.65rem 1.4rem;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  transition:
+    background 0.2s ease-in-out,
+    transform 0.2s ease-in-out;
+}
+
+.upload-button:hover {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+.upload-button input[type='file'] {
+  opacity: 0;
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+}
+
+.meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-height: 1.5rem;
+}
+
+.status {
+  color: #f9fafb;
+}
+
+.status--placeholder {
+  color: rgba(148, 163, 184, 0.75);
+  font-style: italic;
+}
+
+.error {
+  color: #f87171;
+}
+
+.viewer-container {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: clamp(320px, 60vh, 900px);
+  background: #111827;
+  border-radius: 1rem;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.4);
+}
+
+.viewer-container canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.empty-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  color: rgba(226, 232, 240, 0.85);
+  pointer-events: none;
+  gap: 0.35rem;
+  font-size: 1rem;
+  padding: 0 1.5rem;
+}
+
+.empty-state .hint {
+  font-size: 0.9rem;
+  color: rgba(148, 163, 184, 0.75);
+}
+
+@media (max-width: 720px) {
+  .viewer-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .upload-button {
+    width: 100%;
+    justify-content: center;
+  }
+}
