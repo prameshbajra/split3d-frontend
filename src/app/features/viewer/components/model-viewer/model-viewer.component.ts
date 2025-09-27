@@ -461,7 +461,7 @@ export class ModelViewerComponent implements AfterViewInit, OnDestroy {
       {
         key: 'y',
         size: [boxSize.x + thickness, thickness, boxSize.z + thickness],
-        color: 0x34d399,
+        color: 0x60a5fa,
         positionBuilder: (index, total) =>
           new THREE.Vector3(
             boxCenter.x,
@@ -472,7 +472,7 @@ export class ModelViewerComponent implements AfterViewInit, OnDestroy {
       {
         key: 'z',
         size: [boxSize.x + thickness, boxSize.y + thickness, thickness],
-        color: 0x60a5fa,
+        color: 0x34d399,
         positionBuilder: (index, total) =>
           new THREE.Vector3(
             boxCenter.x,
