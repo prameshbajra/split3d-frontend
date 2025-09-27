@@ -18,6 +18,15 @@
       <p class="status status--placeholder">No model loaded yet.</p>
     </ng-template>
     <p *ngIf="errorMessage" class="error">{{ errorMessage }}</p>
+    <div *ngIf="dimensions" class="dimensions">
+      <span>Width (X): {{ dimensions.x | number: '1.0-2' }} mm</span>
+      <span>Height (Y): {{ dimensions.y | number: '1.0-2' }} mm</span>
+      <span>Depth (Z): {{ dimensions.z | number: '1.0-2' }} mm</span>
+    </div>
+    <p class="grid-hint">
+      Grid spacing: {{ workspaceGridUnit }} units (typically mm) per square. Axes: X(red), Y(green),
+      Z(blue).
+    </p>
   </div>
 
   <div class="viewer-container" #viewerContainer>

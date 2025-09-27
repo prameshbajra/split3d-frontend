@@ -82,6 +82,26 @@
   color: #f87171;
 }
 
+.dimensions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.75rem;
+  color: #dbeafe;
+  font-size: 0.9rem;
+}
+
+.dimensions span {
+  background: rgba(37, 99, 235, 0.12);
+  padding: 0.2rem 0.55rem;
+  border-radius: 9999px;
+}
+
+.grid-hint {
+  margin: 0.2rem 0 0;
+  color: rgba(148, 163, 184, 0.75);
+  font-size: 0.85rem;
+}
+
 .viewer-container {
   position: relative;
   flex: 1 1 auto;
