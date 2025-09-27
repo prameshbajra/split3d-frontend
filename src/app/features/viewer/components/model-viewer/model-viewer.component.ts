@@ -1,6 +1,7 @@
 import { AfterViewInit, Component, ElementRef, inject, OnDestroy, ViewChild } from '@angular/core';
 import * as THREE from 'three';
 import { CommonModule } from '@angular/common';
+import { NonNullableFormBuilder, ReactiveFormsModule, Validators, FormControl } from '@angular/forms';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { ModelLoaderService } from '../../services/model-loader.service';
 import {
@@ -9,10 +10,12 @@ import {
   fitCameraToObject,
 } from '../../../../shared/utils/three-utils';
 
+type DivisionCounts = { x: number; y: number; z: number };
+
 @Component({
   selector: 'app-model-viewer',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, ReactiveFormsModule],
   templateUrl: './model-viewer.component.html',
   styleUrl: './model-viewer.component.css',
 })
@@ -35,6 +38,18 @@ export class ModelViewerComponent implements AfterViewInit, OnDestroy {
   private readonly workspaceSize = 400;
   readonly workspaceGridUnit = 10;
   private boundingBoxHelper: THREE.Box3Helper | null = null;
+  private readonly splitPlanesGroup = new THREE.Group();
+  private currentBoundingBox: THREE.Box3 | null = null;
+  private lastAppliedDivisions: DivisionCounts | null = null;
+
+  readonly maxDivisionSegments = 12;
+  private readonly defaultDivisions: DivisionCounts = { x: 1, y: 1, z: 1 };
+  private readonly formBuilder = inject(NonNullableFormBuilder);
+  readonly divisionForm = this.formBuilder.group({
+    x: this.createDivisionControl(),
+    y: this.createDivisionControl(),
+    z: this.createDivisionControl(),
+  });
 
   private readonly modelLoader = inject(ModelLoaderService);
 
@@ -49,6 +64,8 @@ export class ModelViewerComponent implements AfterViewInit, OnDestroy {
     window.removeEventListener('resize', this.handleResize);
     this.resizeObserver?.disconnect();
     this.disposeCurrentModel();
+
+    this.clearSplitPlanes();
 
     if (this.animationFrameId !== null) {
       cancelAnimationFrame(this.animationFrameId);
@@ -94,6 +111,36 @@ export class ModelViewerComponent implements AfterViewInit, OnDestroy {
     input.value = '';
   }
 
+  get hasModelLoaded(): boolean {
+    return this.currentModel !== null;
+  }
+
+  get hasActiveSplits(): boolean {
+    return this.splitPlanesGroup.children.length > 0;
+  }
+
+  applyDivisionSettings(): void {
+    if (!this.hasModelLoaded) {
+      return;
+    }
+
+    if (this.divisionForm.invalid) {
+      this.divisionForm.markAllAsTouched();
+      return;
+    }
+
+    const normalized = this.normalizeCounts(this.divisionForm.getRawValue());
+    this.divisionForm.setValue(normalized, { emitEvent: false });
+    this.lastAppliedDivisions = normalized;
+    this.renderSplitPlanes(normalized);
+  }
+
+  clearDivisionPlanes(): void {
+    this.clearSplitPlanes();
+    this.lastAppliedDivisions = null;
+    this.divisionForm.setValue(this.defaultDivisions, { emitEvent: false });
+  }
+
   private initScene(): void {
     const container = this.viewerContainer.nativeElement;
 
@@ -107,6 +154,7 @@ export class ModelViewerComponent implements AfterViewInit, OnDestroy {
 
     addDefaultLighting(this.scene);
     this.scene.add(this.workspaceGroup);
+    this.scene.add(this.splitPlanesGroup);
     this.buildWorkspace();
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -217,6 +265,13 @@ export class ModelViewerComponent implements AfterViewInit, OnDestroy {
     this.currentModel = model;
     this.dimensions = normalizedBox.isEmpty() ? null : this.extractDimensions(normalizedBox);
     this.updateBoundingBoxHelper(normalizedBox);
+    this.currentBoundingBox = normalizedBox.clone();
+
+    if (this.lastAppliedDivisions) {
+      this.renderSplitPlanes(this.lastAppliedDivisions);
+    } else {
+      this.clearSplitPlanes();
+    }
 
     fitCameraToObject(this.camera, model, this.controls);
   }
@@ -232,6 +287,8 @@ export class ModelViewerComponent implements AfterViewInit, OnDestroy {
     this.currentModel = null;
     this.dimensions = null;
     this.removeBoundingBoxHelper();
+    this.currentBoundingBox = null;
+    this.clearSplitPlanes();
   }
 
   private centerModel(model: THREE.Object3D): THREE.Box3 {
@@ -327,4 +384,140 @@ export class ModelViewerComponent implements AfterViewInit, OnDestroy {
 
     this.updateRendererSize();
   };
+
+  private createDivisionControl(): FormControl<number> {
+    return this.formBuilder.control(1, {
+      validators: [
+        Validators.required,
+        Validators.min(1),
+        Validators.max(this.maxDivisionSegments),
+      ],
+    });
+  }
+
+  private normalizeCounts(counts: DivisionCounts): DivisionCounts {
+    const toSafeInteger = (value: number): number => {
+      if (!Number.isFinite(value)) {
+        return 1;
+      }
+
+      const floored = Math.floor(value);
+      return Math.min(Math.max(floored, 1), this.maxDivisionSegments);
+    };
+
+    return {
+      x: toSafeInteger(counts.x),
+      y: toSafeInteger(counts.y),
+      z: toSafeInteger(counts.z),
+    };
+  }
+
+  private renderSplitPlanes(counts: DivisionCounts): void {
+    this.clearSplitPlanes();
+
+    if (!this.currentBoundingBox) {
+      return;
+    }
+
+    const normalized = this.normalizeCounts(counts);
+    const axisCounts: DivisionCounts = {
+      x: normalized.x,
+      y: normalized.z,
+      z: normalized.y,
+    };
+
+    const boxSize = this.currentBoundingBox.getSize(new THREE.Vector3());
+    const boxMin = this.currentBoundingBox.min.clone();
+    const boxCenter = this.currentBoundingBox.getCenter(new THREE.Vector3());
+
+    const thickness = Math.max(boxSize.x, boxSize.y, boxSize.z) * 0.005 || 0.5;
+
+    const createPlaneMaterial = (color: number) =>
+      new THREE.MeshStandardMaterial({
+        color,
+        transparent: true,
+        opacity: 0.25,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+
+    const axisSettings: Array<{
+      key: keyof DivisionCounts;
+      size: [number, number, number];
+      color: number;
+      positionBuilder: (index: number, total: number) => THREE.Vector3;
+    }> = [
+      {
+        key: 'x',
+        size: [thickness, boxSize.y + thickness, boxSize.z + thickness],
+        color: 0xf97316,
+        positionBuilder: (index, total) =>
+          new THREE.Vector3(
+            boxMin.x + (boxSize.x * index) / total,
+            boxCenter.y,
+            boxCenter.z,
+          ),
+      },
+      {
+        key: 'y',
+        size: [boxSize.x + thickness, thickness, boxSize.z + thickness],
+        color: 0x34d399,
+        positionBuilder: (index, total) =>
+          new THREE.Vector3(
+            boxCenter.x,
+            boxMin.y + (boxSize.y * index) / total,
+            boxCenter.z,
+          ),
+      },
+      {
+        key: 'z',
+        size: [boxSize.x + thickness, boxSize.y + thickness, thickness],
+        color: 0x60a5fa,
+        positionBuilder: (index, total) =>
+          new THREE.Vector3(
+            boxCenter.x,
+            boxCenter.y,
+            boxMin.z + (boxSize.z * index) / total,
+          ),
+      },
+    ];
+
+    axisSettings.forEach(({ key, size, color, positionBuilder }) => {
+      const totalSegments = axisCounts[key];
+      const divisionCount = totalSegments - 1;
+
+      if (divisionCount < 1) {
+        return;
+      }
+
+      for (let index = 1; index <= divisionCount; index += 1) {
+        const geometry = new THREE.BoxGeometry(size[0], size[1], size[2]);
+        const material = createPlaneMaterial(color);
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.position.copy(positionBuilder(index, totalSegments));
+        mesh.renderOrder = 5;
+        this.splitPlanesGroup.add(mesh);
+      }
+    });
+  }
+
+  private clearSplitPlanes(): void {
+    const meshes = [...this.splitPlanesGroup.children];
+
+    meshes.forEach((child) => {
+      this.splitPlanesGroup.remove(child);
+      const mesh = child as THREE.Mesh;
+
+      if (mesh.geometry) {
+        mesh.geometry.dispose();
+      }
+
+      const material = mesh.material;
+      if (Array.isArray(material)) {
+        material.forEach((entry) => entry.dispose());
+      } else if (material) {
+        material.dispose();
+      }
+    });
+  }
 }
