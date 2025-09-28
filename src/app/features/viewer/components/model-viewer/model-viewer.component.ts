@@ -9,13 +9,14 @@ import {
   disposeObject,
   fitCameraToObject,
 } from '../../../../shared/utils/three-utils';
+import { SplitSidebarComponent, DivisionFormGroup } from '../split-sidebar/split-sidebar.component';
 
 type DivisionCounts = { x: number; y: number; z: number };
 
 @Component({
   selector: 'app-model-viewer',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, SplitSidebarComponent],
   templateUrl: './model-viewer.component.html',
   styleUrl: './model-viewer.component.css',
 })
@@ -35,7 +36,10 @@ export class ModelViewerComponent implements AfterViewInit, OnDestroy {
   private currentModel: THREE.Object3D | null = null;
   private resizeObserver?: ResizeObserver;
   private readonly workspaceGroup = new THREE.Group();
-  private readonly workspaceSize = 400;
+  private readonly defaultWorkspaceSize = 400;
+  private readonly workspacePaddingRatio = 0.2;
+  private readonly minWorkspacePadding = 40;
+  private workspaceSize = this.defaultWorkspaceSize;
   readonly workspaceGridUnit = 10;
   private boundingBoxHelper: THREE.Box3Helper | null = null;
   private readonly splitPlanesGroup = new THREE.Group();
@@ -45,7 +49,7 @@ export class ModelViewerComponent implements AfterViewInit, OnDestroy {
   readonly maxDivisionSegments = 12;
   private readonly defaultDivisions: DivisionCounts = { x: 1, y: 1, z: 1 };
   private readonly formBuilder = inject(NonNullableFormBuilder);
-  readonly divisionForm = this.formBuilder.group({
+  readonly divisionForm: DivisionFormGroup = this.formBuilder.group({
     x: this.createDivisionControl(),
     y: this.createDivisionControl(),
     z: this.createDivisionControl(),
@@ -177,6 +181,7 @@ export class ModelViewerComponent implements AfterViewInit, OnDestroy {
   }
 
   private buildWorkspace(): void {
+    this.workspaceGroup.children.forEach((child) => disposeObject(child));
     this.workspaceGroup.clear();
 
     const platformThickness = 6;
@@ -222,6 +227,7 @@ export class ModelViewerComponent implements AfterViewInit, OnDestroy {
     );
     axesHelper.geometry.applyMatrix4(swapMatrix);
     axesHelper.position.set(0, 0.05, 0);
+    this.addAxisLabels(axesHelper);
     this.workspaceGroup.add(axesHelper);
 
     const edgeGeometry = new THREE.EdgesGeometry(platformGeometry);
@@ -229,6 +235,112 @@ export class ModelViewerComponent implements AfterViewInit, OnDestroy {
     const platformEdges = new THREE.LineSegments(edgeGeometry, edgeMaterial);
     platformEdges.position.copy(platform.position);
     this.workspaceGroup.add(platformEdges);
+  }
+
+  private updateWorkspaceSize(box: THREE.Box3): void {
+    if (box.isEmpty()) {
+      this.resetWorkspaceSize();
+      return;
+    }
+
+    const size = box.getSize(new THREE.Vector3());
+    const longestDimension = Math.max(size.x, size.y, size.z);
+    const padding = Math.max(this.minWorkspacePadding, longestDimension * this.workspacePaddingRatio);
+    const desiredSize = longestDimension + padding;
+    const quantizedSize =
+      Math.ceil(desiredSize / this.workspaceGridUnit) * this.workspaceGridUnit;
+    const nextSize = Math.max(this.defaultWorkspaceSize, quantizedSize);
+
+    if (Math.abs(nextSize - this.workspaceSize) < 0.5) {
+      return;
+    }
+
+    this.workspaceSize = nextSize;
+    this.buildWorkspace();
+  }
+
+  private resetWorkspaceSize(): void {
+    if (this.workspaceSize === this.defaultWorkspaceSize) {
+      return;
+    }
+
+    this.workspaceSize = this.defaultWorkspaceSize;
+    this.buildWorkspace();
+  }
+
+  private addAxisLabels(axesHelper: THREE.AxesHelper): void {
+    const halfSize = this.workspaceSize / 2;
+    const offset = Math.max(this.workspaceGridUnit * 1.5, 14);
+    const labelScale = Math.min(Math.max(this.workspaceSize * 0.05, 18), 48);
+
+    const xLabel = this.createAxisLabel('X', '#f87171', labelScale);
+    xLabel.position.set(halfSize + offset, 0, 0);
+    axesHelper.add(xLabel);
+
+    const yLabel = this.createAxisLabel('Y', '#86efac', labelScale);
+    yLabel.position.set(0, 0, halfSize + offset);
+    axesHelper.add(yLabel);
+
+    const zLabel = this.createAxisLabel('Z', '#60a5fa', labelScale);
+    zLabel.position.set(0, halfSize + offset, 0);
+    axesHelper.add(zLabel);
+  }
+
+  private createAxisLabel(text: string, color: string, scale: number): THREE.Sprite {
+    if (typeof document === 'undefined') {
+      const fallbackMaterial = new THREE.SpriteMaterial({ color, depthTest: false, depthWrite: false });
+      const fallbackSprite = new THREE.Sprite(fallbackMaterial);
+      fallbackSprite.scale.setScalar(scale);
+      return fallbackSprite;
+    }
+
+    const size = 128;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+
+    const context = canvas.getContext('2d');
+    if (!context) {
+      const fallbackMaterial = new THREE.SpriteMaterial({ color, depthTest: false, depthWrite: false });
+      const fallbackSprite = new THREE.Sprite(fallbackMaterial);
+      fallbackSprite.scale.setScalar(scale);
+      return fallbackSprite;
+    }
+
+    context.clearRect(0, 0, size, size);
+    context.font = '700 72px sans-serif';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.lineJoin = 'round';
+    context.lineWidth = 10;
+    context.strokeStyle = 'rgba(15, 23, 42, 0.75)';
+    context.strokeText(text, size / 2, size / 2);
+    context.shadowColor = 'rgba(15, 23, 42, 0.5)';
+    context.shadowBlur = 12;
+    context.fillStyle = color;
+    context.fillText(text, size / 2, size / 2);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.anisotropy = 16;
+    texture.generateMipmaps = false;
+    texture.needsUpdate = true;
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+
+    const material = new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+    });
+    material.toneMapped = false;
+    const sprite = new THREE.Sprite(material);
+    sprite.scale.setScalar(scale);
+    sprite.renderOrder = 1;
+    sprite.userData['axisLabel'] = text;
+
+    return sprite;
   }
 
   private observeContainerSize(): void {
@@ -264,6 +376,7 @@ export class ModelViewerComponent implements AfterViewInit, OnDestroy {
     this.scene.add(model);
     this.currentModel = model;
     this.dimensions = normalizedBox.isEmpty() ? null : this.extractDimensions(normalizedBox);
+    this.updateWorkspaceSize(normalizedBox);
     this.updateBoundingBoxHelper(normalizedBox);
     this.currentBoundingBox = normalizedBox.clone();
 
@@ -289,6 +402,7 @@ export class ModelViewerComponent implements AfterViewInit, OnDestroy {
     this.removeBoundingBoxHelper();
     this.currentBoundingBox = null;
     this.clearSplitPlanes();
+    this.resetWorkspaceSize();
   }
 
   private centerModel(model: THREE.Object3D): THREE.Box3 {

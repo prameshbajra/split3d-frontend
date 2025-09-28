@@ -1,0 +1,91 @@
+<aside class="split-sidebar" [class.split-sidebar--disabled]="!hasModelLoaded">
+  <header class="split-sidebar__header">
+    <h2>Split Preview</h2>
+    <p>Pick how many segments you need along each axis, then preview the cut planes.</p>
+  </header>
+
+  <form class="split-form" [formGroup]="divisionForm" (ngSubmit)="apply.emit()">
+    <fieldset>
+      <legend>Divisions</legend>
+      <div class="split-field">
+        <label for="division-x">Along X</label>
+        <div class="input-wrapper">
+          <input
+            id="division-x"
+            type="number"
+            inputmode="numeric"
+            min="1"
+            [max]="maxDivisionSegments"
+            formControlName="x"
+            [disabled]="!hasModelLoaded"
+          />
+          <span class="axis-chip axis-chip--x">X</span>
+        </div>
+        <p
+          class="field-hint"
+          *ngIf="divisionForm.controls.x.invalid && divisionForm.controls.x.touched"
+        >
+          Use 1 to {{ maxDivisionSegments }} segments.
+        </p>
+      </div>
+
+      <div class="split-field">
+        <label for="division-y">Along Y</label>
+        <div class="input-wrapper">
+          <input
+            id="division-y"
+            type="number"
+            inputmode="numeric"
+            min="1"
+            [max]="maxDivisionSegments"
+            formControlName="y"
+            [disabled]="!hasModelLoaded"
+          />
+          <span class="axis-chip axis-chip--y">Y</span>
+        </div>
+        <p
+          class="field-hint"
+          *ngIf="divisionForm.controls.y.invalid && divisionForm.controls.y.touched"
+        >
+          Use 1 to {{ maxDivisionSegments }} segments.
+        </p>
+      </div>
+
+      <div class="split-field">
+        <label for="division-z">Along Z</label>
+        <div class="input-wrapper">
+          <input
+            id="division-z"
+            type="number"
+            inputmode="numeric"
+            min="1"
+            [max]="maxDivisionSegments"
+            formControlName="z"
+            [disabled]="!hasModelLoaded"
+          />
+          <span class="axis-chip axis-chip--z">Z</span>
+        </div>
+        <p
+          class="field-hint"
+          *ngIf="divisionForm.controls.z.invalid && divisionForm.controls.z.touched"
+        >
+          Use 1 to {{ maxDivisionSegments }} segments.
+        </p>
+      </div>
+    </fieldset>
+
+    <div class="split-form__actions">
+      <button type="submit" [disabled]="divisionForm.invalid || !hasModelLoaded">
+        Apply splits
+      </button>
+      <button type="button" class="ghost" (click)="clear.emit()" [disabled]="!hasActiveSplits">
+        Clear preview
+      </button>
+    </div>
+  </form>
+
+  <p class="split-hint">
+    Each split adds translucent guide planes. These are previews only and won't modify your original
+    mesh.
+  </p>
+</aside>

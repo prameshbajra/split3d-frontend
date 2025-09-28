@@ -57,5 +57,12 @@ export function disposeObject(object: THREE.Object3D): void {
         lineSegments.material?.dispose();
       }
     }
+
+    const sprite = child as THREE.Sprite;
+    if (sprite.isSprite) {
+      const material = sprite.material as THREE.SpriteMaterial;
+      material.map?.dispose();
+      material.dispose();
+    }
   });
 }
